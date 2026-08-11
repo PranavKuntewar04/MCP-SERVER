@@ -30,7 +30,7 @@ graph LR
 | 3 | Project builds cleanly (`npm run build`) | ✅ | Verify before deploy |
 | 4 | No hardcoded secrets in `src/` | ✅ | Audit all `.ts` files |
 | 5 | Transport migration to Streamable HTTP | ✅ | See [Section 2](#2-transport-migration-stdio--streamable-http) |
-| 6 | GitHub repo created and pushed | ⬜ | See [Section 3](#3-github-repository-setup) |
+| 6 | GitHub repo created and pushed | ✅ | See [Section 3](#3-github-repository-setup) |
 
 > [!CAUTION]
 > **Never commit `.env`, `credentials.json`, or `tokens.json`** to the repository. These contain OAuth secrets and refresh tokens that grant full access to your Google account. If accidentally committed, rotate credentials immediately in the [Google Cloud Console](https://console.cloud.google.com/).
