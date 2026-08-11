@@ -347,7 +347,7 @@ Update your MCP client config to point to the remote URL:
     "gmail-docs-mcp": {
       "url": "https://mcp-gmail-docs-server-production.up.railway.app/mcp",
       "headers": {
-        "Authorization": "Bearer <your-MCP_AUTH_TOKEN>"
+        "Authorization": "Bearer pranav_mcp"
       }
     }
   }
@@ -368,7 +368,7 @@ const transport = new StreamableHTTPClientTransport(
   {
     requestInit: {
       headers: {
-        Authorization: 'Bearer <your-MCP_AUTH_TOKEN>'
+        Authorization: 'Bearer pranav_mcp'
       }
     }
   }
