@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { handleGmailSendEmail } from './tools/gmailSendEmail.js';
@@ -15,8 +15,11 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', server: 'mcp-gmail-docs', version: '1.0.0' });
 });
 
-// --- MCP endpoint ---
-app.all('/mcp', async (req: Request, res: Response) => {
+// --- MCP endpoints ---
+const transports = new Map<string, SSEServerTransport>();
+
+// 1. GET /mcp/sse - establishes the SSE connection
+app.get('/mcp/sse', async (req: Request, res: Response) => {
   // Optional: Bearer token authentication
   const authHeader = req.headers.authorization;
   const expectedToken = process.env.MCP_AUTH_TOKEN;
@@ -25,7 +28,11 @@ app.all('/mcp', async (req: Request, res: Response) => {
     return;
   }
 
-  // Create a fresh MCP server instance per request (stateless)
+  // Create standard SSE transport. 
+  // It will tell the client to POST messages to /mcp/messages?sessionId=...
+  const transport = new SSEServerTransport('/mcp/messages', res);
+  
+  // Create a fresh MCP server instance for this connection
   const server = new Server(
     { name: 'mcp-gmail-docs', version: '1.0.0' },
     { capabilities: { tools: {} } }
@@ -105,16 +112,42 @@ app.all('/mcp', async (req: Request, res: Response) => {
     };
   });
 
-  // Create transport and handle the request
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
-  await transport.handleRequest(req, res);
+
+  // Store the transport so we can route incoming POST messages to it
+  transports.set(transport.sessionId, transport);
+
+  res.on('close', () => {
+    transports.delete(transport.sessionId);
+  });
+});
+
+// 2. POST /mcp/messages - handles incoming JSON-RPC messages from clients
+app.post('/mcp/messages', async (req: Request, res: Response) => {
+  // Optional: Bearer token authentication for messages as well
+  const authHeader = req.headers.authorization;
+  const expectedToken = process.env.MCP_AUTH_TOKEN;
+  if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+
+  const sessionId = req.query.sessionId as string;
+  const transport = transports.get(sessionId);
+
+  if (!transport) {
+    res.status(404).send('Session not found');
+    return;
+  }
+
+  await transport.handlePostMessage(req, res);
 });
 
 // --- Start the server ---
 const PORT = parseInt(process.env.PORT || '3000', 10);
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`MCP Gmail & Google Docs Server listening on http://0.0.0.0:${PORT}`);
-  console.log(`  → MCP endpoint: POST /mcp`);
-  console.log(`  → Health check: GET  /health`);
+  console.log(`  → MCP SSE endpoint: GET  /mcp/sse`);
+  console.log(`  → MCP msg endpoint: POST /mcp/messages`);
+  console.log(`  → Health check:     GET  /health`);
 });
