@@ -8,7 +8,10 @@ import { handleGmailCreateDraft } from './tools/gmailCreateDraft.js';
 import { handleGdocsAppendContent } from './tools/gdocsAppendContent.js';
 
 const app = express();
-app.use(express.json());
+// NOTE: Do NOT use express.json() globally.
+// The MCP SDK's handlePostMessage reads the raw body stream itself via getRawBody.
+// If express.json() consumes the stream first, handlePostMessage fails with
+// "stream is not readable".
 
 // --- Health check endpoint (Railway uses this to confirm the service is alive) ---
 app.get('/health', (_req: Request, res: Response) => {
@@ -140,6 +143,7 @@ app.post('/mcp/messages', async (req: Request, res: Response) => {
     return;
   }
 
+  // Let the SDK read the raw body stream directly (no express.json() middleware)
   await transport.handlePostMessage(req, res);
 });
 
